@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Capture stacked photos (multiple exposures blended together)
     async function captureStackedPhotos() {
-        const numPhotos = 3; // Capture 3 photos for stacking
+        const numPhotos = 15; // Capture 3 photos for stacking
         stackCount = 0;
         
         try {
