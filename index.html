@@ -8,26 +8,14 @@
     <title>PawShot Camera</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <link rel="stylesheet" href="styles.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 </head>
 <body>
     <div class="app-container">
-        <!-- Notch and Dynamic Island -->
-        <div class="phone-notch">
-            <div class="notch-container">
-                <div class="notch">
-                    <div class="notch-camera"></div>
-                    <div class="dynamic-indicator"></div>
-                </div>
-            </div>
-        </div>
-        
         <!-- Camera Screen -->
         <div class="screen camera-screen">
             <!-- Viewfinder -->
             <div class="viewfinder-container">
-                <video id="viewfinder" autoplay playsinline class="hidden"></video>
+                <video id="viewfinder" autoplay playsinline></video>
                 <canvas id="photo-preview" class="hidden"></canvas>
                 
                 <!-- Camera UI Overlays -->
@@ -41,37 +29,12 @@
                         <button id="hdr-toggle" class="control-button">
                             <span>HDR</span>
                         </button>
-                        
-                        <button id="timer-toggle" class="control-button">
-                            <span class="material-icons-round">timer</span>
-                        </button>
-                        
-                        <div class="exposure-control">
-                            <span class="material-icons-round">exposure</span>
-                        </div>
                     </div>
                     
                     <!-- Zoom Controls -->
                     <div class="zoom-controls">
-                        <div class="zoom-option" data-zoom="0.5x">0.5x</div>
-                        <div class="zoom-option active" data-zoom="1x">1x</div>
-                        <div class="zoom-option" data-zoom="2x">2x</div>
-                        <div class="zoom-option" data-zoom="3x">3x</div>
+                        <div class="zoom-option" data-zoom="1x">1x</div>
                     </div>
-                    
-                    <!-- Quality Indicator -->
-                    <div class="quality-indicator">
-                        <span class="quality-icon">⚡</span>
-                        <span class="quality-text">Ultra · 15 frames</span>
-                    </div>
-                    
-                    <!-- Stack Counter -->
-                    <div class="stack-counter">
-                        <span>0/15</span>
-                    </div>
-                    
-                    <!-- Exposure Indicator -->
-                    <div class="exposure-indicator">+0</div>
                 </div>
             </div>
             
@@ -87,26 +50,6 @@
                         <div class="filter-preview"></div>
                         <span>Mono</span>
                     </div>
-                    <div class="filter-effect" data-filter="noir">
-                        <div class="filter-preview"></div>
-                        <span>Noir</span>
-                    </div>
-                    <div class="filter-effect" data-filter="fade">
-                        <div class="filter-preview"></div>
-                        <span>Fade</span>
-                    </div>
-                    <div class="filter-effect" data-filter="chrome">
-                        <div class="filter-preview"></div>
-                        <span>Chrome</span>
-                    </div>
-                    <div class="filter-effect" data-filter="process">
-                        <div class="filter-preview"></div>
-                        <span>Process</span>
-                    </div>
-                    <div class="filter-effect" data-filter="instant">
-                        <div class="filter-preview"></div>
-                        <span>Instant</span>
-                    </div>
                     <div class="filter-effect" data-filter="warm">
                         <div class="filter-preview"></div>
                         <span>Warm</span>
@@ -114,10 +57,6 @@
                     <div class="filter-effect" data-filter="cool">
                         <div class="filter-preview"></div>
                         <span>Cool</span>
-                    </div>
-                    <div class="filter-effect" data-filter="vivid">
-                        <div class="filter-preview"></div>
-                        <span>Vivid</span>
                     </div>
                     <div class="filter-effect" data-filter="paws">
                         <div class="filter-preview"></div>
@@ -162,9 +101,6 @@
                     <span class="material-icons-round">arrow_back</span>
                 </button>
                 <h1>Gallery</h1>
-                <button id="select-photos" class="header-button">
-                    <span class="material-icons-round">check_box_outline_blank</span>
-                </button>
             </div>
             
             <div class="gallery-grid"></div>
@@ -177,9 +113,6 @@
                     <span class="material-icons-round">arrow_back</span>
                 </button>
                 <h1>Edit</h1>
-                <button id="save-edit" class="header-button">
-                    <span class="material-icons-round">check</span>
-                </button>
             </div>
             
             <div class="edit-image-container">
@@ -187,58 +120,7 @@
             </div>
             
             <div class="edit-controls">
-                <div class="edit-filter-carousel">
-                    <div class="edit-filter active" data-filter="normal">
-                        <div class="filter-preview"></div>
-                        <span>Normal</span>
-                    </div>
-                    <div class="edit-filter" data-filter="mono">
-                        <div class="filter-preview"></div>
-                        <span>Mono</span>
-                    </div>
-                    <div class="edit-filter" data-filter="noir">
-                        <div class="filter-preview"></div>
-                        <span>Noir</span>
-                    </div>
-                    <div class="edit-filter" data-filter="fade">
-                        <div class="filter-preview"></div>
-                        <span>Fade</span>
-                    </div>
-                    <div class="edit-filter" data-filter="chrome">
-                        <div class="filter-preview"></div>
-                        <span>Chrome</span>
-                    </div>
-                    <div class="edit-filter" data-filter="process">
-                        <div class="filter-preview"></div>
-                        <span>Process</span>
-                    </div>
-                    <div class="edit-filter" data-filter="instant">
-                        <div class="filter-preview"></div>
-                        <span>Instant</span>
-                    </div>
-                    <div class="edit-filter" data-filter="warm">
-                        <div class="filter-preview"></div>
-                        <span>Warm</span>
-                    </div>
-                    <div class="edit-filter" data-filter="cool">
-                        <div class="filter-preview"></div>
-                        <span>Cool</span>
-                    </div>
-                    <div class="edit-filter" data-filter="vivid">
-                        <div class="filter-preview"></div>
-                        <span>Vivid</span>
-                    </div>
-                    <div class="edit-filter" data-filter="paws">
-                        <div class="filter-preview"></div>
-                        <span>Paws</span>
-                    </div>
-                </div>
-                
                 <div class="edit-actions">
-                    <button id="share-photo" class="edit-action-button">
-                        <span class="material-icons-round">share</span>
-                        <span>Share</span>
-                    </button>
                     <button id="delete-photo" class="edit-action-button">
                         <span class="material-icons-round">delete</span>
                         <span>Delete</span>
@@ -247,106 +129,10 @@
             </div>
         </div>
         
-        <!-- Advanced Settings Modal -->
-        <div class="settings-modal hidden">
-            <div class="settings-header">
-                <h2>Stack Settings</h2>
-                <button id="close-settings" class="header-button">
-                    <span class="material-icons-round">close</span>
-                </button>
-            </div>
-            
-            <div class="settings-content">
-                <div class="settings-group">
-                    <h3>Quality</h3>
-                    <div class="quality-options">
-                        <div class="quality-option" data-quality="standard">
-                            <div class="option-icon">🔵</div>
-                            <div class="option-label">Standard</div>
-                            <div class="option-description">8 frames, balanced quality</div>
-                        </div>
-                        <div class="quality-option" data-quality="high">
-                            <div class="option-icon">🟢</div>
-                            <div class="option-label">High</div>
-                            <div class="option-description">12 frames, improved detail</div>
-                        </div>
-                        <div class="quality-option" data-quality="ultra">
-                            <div class="option-icon">⚡</div>
-                            <div class="option-label">Ultra</div>
-                            <div class="option-description">15 frames, maximum quality</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="settings-group">
-                    <h3>Processing</h3>
-                    <div class="slider-setting">
-                        <label for="noise-reduction">Noise Reduction</label>
-                        <input type="checkbox" id="noise-reduction" checked>
-                    </div>
-                    
-                    <div class="slider-setting">
-                        <label for="super-resolution">Super Resolution</label>
-                        <input type="checkbox" id="super-resolution" checked>
-                    </div>
-                    
-                    <div class="radio-setting">
-                        <h4>Processing Speed</h4>
-                        <div class="radio-options">
-                            <label>
-                                <input type="radio" name="processing" value="fast">
-                                Fast
-                            </label>
-                            <label>
-                                <input type="radio" name="processing" value="balanced" checked>
-                                Balanced
-                            </label>
-                            <label>
-                                <input type="radio" name="processing" value="quality">
-                                Quality
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="radio-setting">
-                        <h4>Frame Alignment</h4>
-                        <div class="radio-options">
-                            <label>
-                                <input type="radio" name="alignment" value="none">
-                                None
-                            </label>
-                            <label>
-                                <input type="radio" name="alignment" value="basic">
-                                Basic
-                            </label>
-                            <label>
-                                <input type="radio" name="alignment" value="auto" checked>
-                                Auto
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <button id="save-stack-settings" class="save-settings-button">Save Settings</button>
-            </div>
-        </div>
-        
         <!-- Notification Toast -->
         <div class="notification-toast"></div>
     </div>
     
     <script src="app.js"></script>
-    <script>
-        // Service worker registration for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful with scope:', registration.scope);
-                })
-                .catch(error => {
-                    console.error('ServiceWorker registration failed:', error);
-                });
-        }
-    </script>
 </body>
 </html>
