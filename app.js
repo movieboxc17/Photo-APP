@@ -16,6 +16,9 @@ let burstInterval = null;
 let timerActive = false;
 let timerCountdown = 0;
 let timerInterval = null;
+let stream = null;
+let streamActive = false;
+let deferredInstallPrompt = null;
 
 // Mode titles for UI
 const modeTitles = {
@@ -60,8 +63,10 @@ function initCamera() {
     
     // Request camera access
     navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-            videoStream = stream;
+        .then(str => {
+            videoStream = str;
+            stream = str;
+            streamActive = true;
             videoTrack = stream.getVideoTracks()[0];
             
             // Apply camera settings
@@ -408,788 +413,788 @@ function capturePhoto() {
     // Show photo preview
     showPhotoPreview(photoData);
     
-    // Reset capture state after delay
-    setTimeout(() => {
-        isCapturing = false;
-        
-        // If in burst mode, continue capturing
-        if (burstModeActive && currentMode === 'burst') {
-            capturePhoto();
+        // Reset capture state after delay
+        setTimeout(() => {
+            isCapturing = false;
+            
+            // If in burst mode, continue capturing
+            if (burstModeActive && currentMode === 'burst') {
+                capturePhoto();
+            }
+        }, 500);
+    }
+    
+    // Process image based on current mode
+    function processImage(context, width, height) {
+        // Apply selected filter
+        if (currentFilter !== 'normal') {
+            applyFilterToCanvas(context, width, height, currentFilter);
         }
-    }, 500);
-}
-
-// Process image based on current mode
-function processImage(context, width, height) {
-    // Apply selected filter
-    if (currentFilter !== 'normal') {
-        applyFilterToCanvas(context, width, height, currentFilter);
+        
+        // Apply specific mode processing
+        switch (currentMode) {
+            case 'portrait':
+                applyPortraitEffect(context, width, height);
+                break;
+                
+            case 'night':
+                applyNightEffect(context, width, height);
+                break;
+                
+            case 'paw':
+                applyPawOverlay(context, width, height);
+                break;
+                
+            case 'dramatic':
+                applyDramaticEffect(context, width, height);
+                break;
+        }
     }
     
-    // Apply specific mode processing
-    switch (currentMode) {
-        case 'portrait':
-            applyPortraitEffect(context, width, height);
-            break;
-            
-        case 'night':
-            applyNightEffect(context, width, height);
-            break;
-            
-        case 'paw':
-            applyPawOverlay(context, width, height);
-            break;
-            
-        case 'dramatic':
-            applyDramaticEffect(context, width, height);
-            break;
-    }
-}
-
-// Apply filter to canvas
-function applyFilterToCanvas(context, width, height, filter) {
-    // Get image data
-    const imageData = context.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    
-    // Apply filter adjustments
-    switch (filter) {
-        case 'vivid':
-            // Increase saturation and contrast
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
+    // Apply filter to canvas
+    function applyFilterToCanvas(context, width, height, filter) {
+        // Get image data
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        
+        // Apply filter adjustments
+        switch (filter) {
+            case 'vivid':
+                // Increase saturation and contrast
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Convert to HSL
+                    const [h, s, l] = rgbToHsl(r, g, b);
+                    
+                    // Increase saturation and adjust lightness
+                    const newS = Math.min(1, s * 1.3); // More saturated
+                    const newL = l > 0.5 ? Math.min(1, l * 1.1) : Math.max(0, l * 0.9); // Increase contrast
+                    
+                    // Convert back to RGB
+                    const [newR, newG, newB] = hslToRgb(h, newS, newL);
+                    
+                    data[i] = newR;
+                    data[i + 1] = newG;
+                    data[i + 2] = newB;
+                }
+                break;
                 
-                // Convert to HSL
-                const [h, s, l] = rgbToHsl(r, g, b);
+            case 'bw':
+                // Black and white
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Convert to grayscale with weighted channels for better BW conversion
+                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                    
+                    data[i] = gray;
+                    data[i + 1] = gray;
+                    data[i + 2] = gray;
+                }
+                break;
                 
-                // Increase saturation and adjust lightness
-                const newS = Math.min(1, s * 1.3); // More saturated
-                const newL = l > 0.5 ? Math.min(1, l * 1.1) : Math.max(0, l * 0.9); // Increase contrast
+            case 'sepia':
+                // Sepia tone
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
+                    data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
+                    data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
+                }
+                break;
                 
-                // Convert back to RGB
-                const [newR, newG, newB] = hslToRgb(h, newS, newL);
-                
-                data[i] = newR;
-                data[i + 1] = newG;
-                data[i + 2] = newB;
-            }
-            break;
-            
-        case 'bw':
-            // Black and white
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Convert to grayscale with weighted channels for better BW conversion
-                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                
-                data[i] = gray;
-                data[i + 1] = gray;
-                data[i + 2] = gray;
-            }
-            break;
-            
-        case 'sepia':
-            // Sepia tone
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
-                data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
-                data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
-            }
-            break;
-            
-        case 'vintage':
-            // Vintage look with color shift and vignette
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Warm color shift
-                const newR = Math.min(255, r * 1.1);
-                const newG = Math.min(255, g * 0.9);
-                const newB = Math.min(255, b * 0.7);
-                
-                data[i] = newR;
-                data[i + 1] = newG;
-                data[i + 2] = newB;
-            }
-            
-            // Add vignette
-            addVignette(context, width, height, 0.7, 0.3);
-            break;
-            
-        case 'dramatic':
-            // High contrast, slightly desaturated
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Convert to HSL
-                const [h, s, l] = rgbToHsl(r, g, b);
-                
-                // Adjust for dramatic effect
-                const newS = Math.max(0, s * 0.85); // Slightly desaturated
-                const newL = l < 0.5 ? l * 0.7 : 0.5 + (l - 0.5) * 1.3; // Boost contrast
-                
-                // Convert back to RGB
-                const [newR, newG, newB] = hslToRgb(h, newS, newL);
-                
-                data[i] = newR;
-                data[i + 1] = newG;
-                data[i + 2] = newB;
-            }
-            break;
-            
-        case 'noir':
-            // Film noir - high contrast black and white with grain
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // High contrast grayscale
-                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                
-                // Boost contrast
-                gray = gray < 128 ? gray * 0.8 : 128 + (gray - 128) * 1.2;
-                
-                // Add subtle grain
-                const noise = (Math.random() - 0.5) * 15;
-                gray = Math.max(0, Math.min(255, gray + noise));
-                
-                data[i] = gray;
-                data[i + 1] = gray;
-                data[i + 2] = gray;
-            }
-            break;
-            
-        case 'pawify':
-            // More vibrant, pet-friendly colors
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Convert to HSL
-                const [h, s, l] = rgbToHsl(r, g, b);
-                
-                // Enhance warm tones (good for pet fur)
-                let newH = h;
-                if (h > 0.05 && h < 0.17) {  // Yellow/orange/brown range
-                    newH = h * 0.95;  // Slightly shift towards red
+            case 'vintage':
+                // Vintage look with color shift and vignette
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Warm color shift
+                    const newR = Math.min(255, r * 1.1);
+                    const newG = Math.min(255, g * 0.9);
+                    const newB = Math.min(255, b * 0.7);
+                    
+                    data[i] = newR;
+                    data[i + 1] = newG;
+                    data[i + 2] = newB;
                 }
                 
-                // Boost saturation and adjust lightness
-                const newS = Math.min(1, s * 1.2);
-                const newL = l < 0.2 ? l * 1.1 : l;  // Brighten shadows
+                // Add vignette
+                addVignette(context, width, height, 0.7, 0.3);
+                break;
                 
-                // Convert back to RGB
-                const [newR, newG, newB] = hslToRgb(newH, newS, newL);
+            case 'dramatic':
+                // High contrast, slightly desaturated
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Convert to HSL
+                    const [h, s, l] = rgbToHsl(r, g, b);
+                    
+                    // Adjust for dramatic effect
+                    const newS = Math.max(0, s * 0.85); // Slightly desaturated
+                    const newL = l < 0.5 ? l * 0.7 : 0.5 + (l - 0.5) * 1.3; // Boost contrast
+                    
+                    // Convert back to RGB
+                    const [newR, newG, newB] = hslToRgb(h, newS, newL);
+                    
+                    data[i] = newR;
+                    data[i + 1] = newG;
+                    data[i + 2] = newB;
+                }
+                break;
                 
-                data[i] = newR;
-                data[i + 1] = newG;
-                data[i + 2] = newB;
+            case 'noir':
+                // Film noir - high contrast black and white with grain
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // High contrast grayscale
+                    let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                    
+                    // Boost contrast
+                    gray = gray < 128 ? gray * 0.8 : 128 + (gray - 128) * 1.2;
+                    
+                    // Add subtle grain
+                    const noise = (Math.random() - 0.5) * 15;
+                    gray = Math.max(0, Math.min(255, gray + noise));
+                    
+                    data[i] = gray;
+                    data[i + 1] = gray;
+                    data[i + 2] = gray;
+                }
+                break;
+                
+            case 'pawify':
+                // More vibrant, pet-friendly colors
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Convert to HSL
+                    const [h, s, l] = rgbToHsl(r, g, b);
+                    
+                    // Enhance warm tones (good for pet fur)
+                    let newH = h;
+                    if (h > 0.05 && h < 0.17) {  // Yellow/orange/brown range
+                        newH = h * 0.95;  // Slightly shift towards red
+                    }
+                    
+                    // Boost saturation and adjust lightness
+                    const newS = Math.min(1, s * 1.2);
+                    const newL = l < 0.2 ? l * 1.1 : l;  // Brighten shadows
+                    
+                    // Convert back to RGB
+                    const [newR, newG, newB] = hslToRgb(newH, newS, newL);
+                    
+                    data[i] = newR;
+                    data[i + 1] = newG;
+                    data[i + 2] = newB;
+                }
+                
+                // Optional: add paw overlay
+                applyPawOverlay(context, width, height, 0.1);
+                break;
+        }
+        
+        // Put the modified data back
+        context.putImageData(imageData, 0, 0);
+    }
+    
+    // Apply portrait mode effect (background blur)
+    function applyPortraitEffect(context, width, height) {
+        // Create a copy of the original image
+        const originalData = context.getImageData(0, 0, width, height);
+        
+        // Create a blurred version for the background
+        context.filter = 'blur(8px)';
+        context.drawImage(canvas, 0, 0);
+        const blurredData = context.getImageData(0, 0, width, height);
+        
+        // Reset filter
+        context.filter = 'none';
+        
+        // Restore original image
+        context.putImageData(originalData, 0, 0);
+        
+        // TODO: In a real app, we would use ML to detect pets/subjects
+        // For this demo, we'll simulate a depth map with a radial gradient
+        
+        // Create a simulated depth map (centered oval)
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxDistance = Math.sqrt(Math.pow(width/2, 2) + Math.pow(height/2, 2)) * 0.6;
+        
+        const depthMap = context.createImageData(width, height);
+        
+        // Calculate depth values (0 = foreground, 255 = background)
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) * 1.5); // Oval shape
+                const depth = Math.min(255, (distance / maxDistance) * 255);
+                
+                const index = (y * width + x) * 4;
+                depthMap.data[index] = depth;
+                depthMap.data[index + 1] = depth;
+                depthMap.data[index + 2] = depth;
+                depthMap.data[index + 3] = 255;
+            }
+        }
+        
+        // Blend original and blurred based on depth map
+        const resultData = context.createImageData(width, height);
+        for (let i = 0; i < originalData.data.length; i += 4) {
+            const blendFactor = depthMap.data[i] / 255;
+            
+            resultData.data[i] = (1 - blendFactor) * originalData.data[i] + blendFactor * blurredData.data[i];
+            resultData.data[i + 1] = (1 - blendFactor) * originalData.data[i + 1] + blendFactor * blurredData.data[i + 1];
+            resultData.data[i + 2] = (1 - blendFactor) * originalData.data[i + 2] + blendFactor * blurredData.data[i + 2];
+            resultData.data[i + 3] = 255;
+        }
+        
+        // Put the result back
+        context.putImageData(resultData, 0, 0);
+    }
+    
+    // Apply night mode effect
+    function applyNightEffect(context, width, height) {
+        // Get image data
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        
+        // Increase brightness, especially in dark areas
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Calculate luminance
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // Brighten dark areas more than bright areas
+            const brightnessFactor = Math.max(1.2, 2 - (luminance / 128));
+            
+            data[i] = Math.min(255, r * brightnessFactor);
+            data[i + 1] = Math.min(255, g * brightnessFactor);
+            data[i + 2] = Math.min(255, b * brightnessFactor);
+        }
+        
+        // Put the modified data back
+        context.putImageData(imageData, 0, 0);
+        
+        // Add subtle noise to simulate night photography
+        addNoise(context, width, height, 10);
+        
+        // Add a subtle blue tint
+        addColorTint(context, width, height, 0, 0, 30, 0.2);
+    }
+    
+    // Apply paw overlay
+    function applyPawOverlay(context, width, height, opacity = 0.2) {
+        // We'll add a paw print overlay in one corner
+        const pawSize = Math.min(width, height) * 0.2;
+        const pawX = width * 0.8;
+        const pawY = height * 0.8;
+        
+        // Draw paw shape
+        context.globalAlpha = opacity;
+        context.fillStyle = '#fff';
+        
+        // Main pad
+        context.beginPath();
+        context.ellipse(pawX, pawY, pawSize / 2, pawSize / 2 * 0.8, 0, 0, Math.PI * 2);
+        context.fill();
+        
+        // Toes
+        for (let i = 0; i < 4; i++) {
+            const angle = (Math.PI / 4) + (i * Math.PI / 6);
+            const toeX = pawX + Math.cos(angle) * pawSize * 0.6;
+            const toeY = pawY - Math.sin(angle) * pawSize * 0.6;
+            
+            context.beginPath();
+            context.ellipse(toeX, toeY, pawSize / 4, pawSize / 4 * 0.8, angle, 0, Math.PI * 2);
+            context.fill();
+        }
+        
+        // Reset alpha
+        context.globalAlpha = 1;
+    }
+    
+    // Apply dramatic effect
+    function applyDramaticEffect(context, width, height) {
+        // Add a strong vignette
+        addVignette(context, width, height, 0.8, 0.5);
+        
+        // Add a subtle cinematic color grade (teal/orange)
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Convert to HSL
+            const [h, s, l] = rgbToHsl(r, g, b);
+            
+            // Adjust hue to push towards teal/orange
+            let newH = h;
+            if (h > 0.2 && h < 0.5) { // Push greens/cyans towards teal
+                newH = 0.5;
+            } else if (h > 0.05 && h < 0.2) { // Push yellows towards orange
+                newH = 0.08;
             }
             
-            // Optional: add paw overlay
-            applyPawOverlay(context, width, height, 0.1);
-            break;
+                    // Increase contrast
+        const newL = l < 0.5 ? l * 0.8 : 0.5 + (l - 0.5) * 1.2;
+
+        // Convert back to RGB
+        const [newR, newG, newB] = hslToRgb(newH, s, newL);
+        
+        data[i] = newR;
+        data[i + 1] = newG;
+        data[i + 2] = newB;
     }
     
     // Put the modified data back
     context.putImageData(imageData, 0, 0);
 }
 
-// Apply portrait mode effect (background blur)
-function applyPortraitEffect(context, width, height) {
-    // Create a copy of the original image
-    const originalData = context.getImageData(0, 0, width, height);
-    
-    // Create a blurred version for the background
-    context.filter = 'blur(8px)';
-    context.drawImage(canvas, 0, 0);
-    const blurredData = context.getImageData(0, 0, width, height);
-    
-    // Reset filter
-    context.filter = 'none';
-    
-    // Restore original image
-    context.putImageData(originalData, 0, 0);
-    
-    // TODO: In a real app, we would use ML to detect pets/subjects
-    // For this demo, we'll simulate a depth map with a radial gradient
-    
-    // Create a simulated depth map (centered oval)
+// Add vignette effect
+function addVignette(context, width, height, intensity = 0.5, size = 0.4) {
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxDistance = Math.sqrt(Math.pow(width/2, 2) + Math.pow(height/2, 2)) * 0.6;
+    const radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2)) / 2;
     
-    const depthMap = context.createImageData(width, height);
+    // Create radial gradient
+    const gradient = context.createRadialGradient(
+        centerX, centerY, radius * size,
+        centerX, centerY, radius
+    );
     
-    // Calculate depth values (0 = foreground, 255 = background)
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) * 1.5); // Oval shape
-            const depth = Math.min(255, (distance / maxDistance) * 255);
-            
-            const index = (y * width + x) * 4;
-            depthMap.data[index] = depth;
-            depthMap.data[index + 1] = depth;
-            depthMap.data[index + 2] = depth;
-            depthMap.data[index + 3] = 255;
-        }
-    }
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, `rgba(0, 0, 0, ${intensity})`);
     
-    // Blend original and blurred based on depth map
-    const resultData = context.createImageData(width, height);
-    for (let i = 0; i < originalData.data.length; i += 4) {
-        const blendFactor = depthMap.data[i] / 255;
-        
-        resultData.data[i] = (1 - blendFactor) * originalData.data[i] + blendFactor * blurredData.data[i];
-        resultData.data[i + 1] = (1 - blendFactor) * originalData.data[i + 1] + blendFactor * blurredData.data[i + 1];
-        resultData.data[i + 2] = (1 - blendFactor) * originalData.data[i + 2] + blendFactor * blurredData.data[i + 2];
-        resultData.data[i + 3] = 255;
-    }
-    
-    // Put the result back
-    context.putImageData(resultData, 0, 0);
+    // Draw vignette
+    context.globalCompositeOperation = 'multiply';
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, width, height);
+    context.globalCompositeOperation = 'source-over';
 }
 
-// Apply night mode effect
-function applyNightEffect(context, width, height) {
-    // Get image data
+// Add noise effect
+function addNoise(context, width, height, intensity = 20) {
     const imageData = context.getImageData(0, 0, width, height);
     const data = imageData.data;
     
-    // Increase brightness, especially in dark areas
     for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
+        const noise = (Math.random() - 0.5) * intensity;
         
-        // Calculate luminance
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        
-        // Brighten dark areas more than bright areas
-        const brightnessFactor = Math.max(1.2, 2 - (luminance / 128));
-        
-        data[i] = Math.min(255, r * brightnessFactor);
-        data[i + 1] = Math.min(255, g * brightnessFactor);
-        data[i + 2] = Math.min(255, b * brightnessFactor);
+        data[i] = Math.max(0, Math.min(255, data[i] + noise));
+        data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+        data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
     }
     
-    // Put the modified data back
     context.putImageData(imageData, 0, 0);
-    
-    // Add subtle noise to simulate night photography
-    addNoise(context, width, height, 10);
-    
-    // Add a subtle blue tint
-    addColorTint(context, width, height, 0, 0, 30, 0.2);
 }
 
-// Apply paw overlay
-function applyPawOverlay(context, width, height, opacity = 0.2) {
-    // We'll add a paw print overlay in one corner
-    const pawSize = Math.min(width, height) * 0.2;
-    const pawX = width * 0.8;
-    const pawY = height * 0.8;
+// Add color tint
+function addColorTint(context, width, height, r, g, b, strength = 0.3) {
+    context.globalCompositeOperation = 'overlay';
+    context.fillStyle = `rgba(${r}, ${g}, ${b}, ${strength})`;
+    context.fillRect(0, 0, width, height);
+    context.globalCompositeOperation = 'source-over';
+}
+
+// Start timer countdown
+function startTimer() {
+    if (timerActive) return;
     
-    // Draw paw shape
-    context.globalAlpha = opacity;
-    context.fillStyle = '#fff';
+    timerActive = true;
+    timerCountdown = appSettings.timerDuration;
     
-    // Main pad
-    context.beginPath();
-    context.ellipse(pawX, pawY, pawSize / 2, pawSize / 2 * 0.8, 0, 0, Math.PI * 2);
-    context.fill();
+    // Create countdown display
+    const countdownEl = document.createElement('div');
+    countdownEl.className = 'countdown-display';
+    countdownEl.textContent = timerCountdown;
+    document.body.appendChild(countdownEl);
     
-    // Toes
-    for (let i = 0; i < 4; i++) {
-        const angle = (Math.PI / 4) + (i * Math.PI / 6);
-        const toeX = pawX + Math.cos(angle) * pawSize * 0.6;
-        const toeY = pawY - Math.sin(angle) * pawSize * 0.6;
+    // Play start sound
+    playSound('focus');
+    
+    // Start countdown
+    timerInterval = setInterval(() => {
+        timerCountdown--;
         
-        context.beginPath();
-        context.ellipse(toeX, toeY, pawSize / 4, pawSize / 4 * 0.8, angle, 0, Math.PI * 2);
-        context.fill();
+        if (timerCountdown > 0) {
+            // Update display
+            countdownEl.textContent = timerCountdown;
+            
+            // Play tick sound
+            playSound('focus');
+        } else {
+            // Clear interval
+            clearInterval(timerInterval);
+            
+            // Remove countdown display
+            countdownEl.remove();
+            
+            // Take photo
+            capturePhoto();
+        }
+    }, 1000);
+}
+
+// Flash screen effect
+function flashScreen() {
+    const flash = document.createElement('div');
+    flash.className = 'screen-flash';
+    document.body.appendChild(flash);
+    
+    // Trigger animation
+    setTimeout(() => {
+        flash.classList.add('active');
+        
+        // Remove after animation
+        setTimeout(() => {
+            flash.remove();
+        }, 300);
+    }, 10);
+}
+
+// Start burst mode
+function startBurstMode() {
+    if (burstModeActive) return;
+    
+    burstModeActive = true;
+    
+    // Show burst indicator
+    const burstIndicator = document.createElement('div');
+    burstIndicator.className = 'burst-indicator';
+    burstIndicator.textContent = 'BURST';
+    document.body.appendChild(burstIndicator);
+    
+    // Capture first photo
+    capturePhoto();
+    
+    // Set timeout to stop burst after a few seconds
+    setTimeout(() => {
+        stopBurstMode();
+    }, 3000);
+}
+
+// Stop burst mode
+function stopBurstMode() {
+    burstModeActive = false;
+    
+    // Remove burst indicator
+    const indicator = document.querySelector('.burst-indicator');
+    if (indicator) indicator.remove();
+    
+    // Show notification
+    showNotification('Burst captured!', 'success');
+}
+
+// Save photo to gallery
+function savePhotoToGallery(photoData, mode) {
+    // Create photo object
+    const photo = {
+        id: Date.now(), // Use timestamp as ID
+        data: photoData,
+        date: new Date().toISOString(),
+        mode: mode,
+        filter: currentFilter,
+        favorite: false
+    };
+    
+    // Add to saved photos array
+    savedPhotos.push(photo);
+    
+    // Save to localStorage
+    localStorage.setItem('pawShotGallery', JSON.stringify(savedPhotos));
+    
+    // Update gallery count
+    updateGalleryCount();
+    
+    // Show success notification
+    showNotification('Photo captured!', 'success');
+    
+    return photo;
+}
+
+// Update gallery count display
+function updateGalleryCount() {
+    const countElement = document.querySelector('.gallery-count');
+    if (countElement) {
+        countElement.textContent = savedPhotos.length;
+    }
+}
+
+// Render gallery
+function renderGallery() {
+    const galleryGrid = document.querySelector('.gallery-grid');
+    if (!galleryGrid) return;
+    
+    // Clear existing items
+    galleryGrid.innerHTML = '';
+    
+    // If no photos, show empty state
+    if (savedPhotos.length === 0) {
+        galleryGrid.innerHTML = `
+            <div class="empty-gallery">
+                <i class="material-icons">photo_library</i>
+                <p>No photos yet</p>
+                <p>Capture some pet moments!</p>
+            </div>
+        `;
+        return;
     }
     
-    // Reset alpha
-    context.globalAlpha = 1;
+    // Sort photos by date (newest first)
+    const sortedPhotos = [...savedPhotos].sort((a, b) => {
+        return new Date(b.date) - new Date(a.date);
+    });
+    
+    // Create gallery items
+    sortedPhotos.forEach(photo => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.dataset.id = photo.id;
+        
+        item.innerHTML = `
+            <img src="${photo.data}" alt="Pet photo">
+            <div class="gallery-item-overlay">
+                <button class="favorite-button ${photo.favorite ? 'active' : ''}">
+                    <i class="material-icons">${photo.favorite ? 'favorite' : 'favorite_border'}</i>
+                </button>
+                <button class="share-button">
+                    <i class="material-icons">share</i>
+                </button>
+                <button class="delete-button">
+                    <i class="material-icons">delete</i>
+                </button>
+            </div>
+            <div class="photo-info">
+                <span class="photo-date">${formatDate(photo.date)}</span>
+                <span class="photo-mode">${modeTitles[photo.mode] || photo.mode}</span>
+            </div>
+        `;
+        
+        galleryGrid.appendChild(item);
+        
+        // Add event listeners
+        const favoriteBtn = item.querySelector('.favorite-button');
+        favoriteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavorite(photo.id);
+            favoriteBtn.classList.toggle('active');
+            favoriteBtn.querySelector('i').textContent = favoriteBtn.classList.contains('active') ? 'favorite' : 'favorite_border';
+        });
+        
+        const shareBtn = item.querySelector('.share-button');
+        shareBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sharePhoto(photo.data);
+        });
+        
+        const deleteBtn = item.querySelector('.delete-button');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deletePhoto(photo.id);
+            item.remove();
+            
+            // Check if gallery is now empty
+            if (savedPhotos.length === 0) {
+                renderGallery();
+            }
+        });
+        
+        // Open photo detail view when clicked
+        item.addEventListener('click', () => {
+            openPhotoDetail(photo);
+        });
+    });
 }
 
-// Add dramatic effect
-function applyDramaticEffect(context, width, height) {
-    // Add a strong vignette
-    addVignette(context, width, height, 0.8, 0.5);
+// Format date for display
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
     
-    // Add a subtle cinematic color grade (teal/orange)
-    const imageData = context.getImageData(0, 0, width, height);
-    const data = imageData.data;
+    const isToday = date.toDateString() === now.toDateString();
     
-    for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        
-        // Convert to HSL
-        const [h, s, l] = rgbToHsl(r, g, b);
-        
-        // Adjust hue to push towards teal/orange
-        let newH = h;
-        if (h > 0.2 && h < 0.5) { // Push greens/cyans towards teal
-            newH = 0.5;
-        } else if (h > 0.05 && h < 0.2) { // Push yellows towards orange
-            newH = 0.08;
-        }
-        
-                // Increase contrast
-                const newL = l < 0.5 ? l * 0.8 : 0.5 + (l - 0.5) * 1.2;
-        
-                // Convert back to RGB
-                const [newR, newG, newB] = hslToRgb(newH, s, newL);
+    if (isToday) {
+        return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + 
+                ` at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+}
+
+// Toggle favorite status
+function toggleFavorite(id) {
+    const index = savedPhotos.findIndex(p => p.id === id);
+    if (index !== -1) {
+        savedPhotos[index].favorite = !savedPhotos[index].favorite;
+        localStorage.setItem('pawShotGallery', JSON.stringify(savedPhotos));
+    }
+}
+
+// Share photo
+function sharePhoto(photoData) {
+    if (navigator.share) {
+        // Convert base64 to blob
+        fetch(photoData)
+            .then(res => res.blob())
+            .then(blob => {
+                const file = new File([blob], 'pawshot-photo.jpg', { type: 'image/jpeg' });
                 
-                data[i] = newR;
-                data[i + 1] = newG;
-                data[i + 2] = newB;
-            }
-            
-            // Put the modified data back
-            context.putImageData(imageData, 0, 0);
-        }
+                navigator.share({
+                    title: 'PawShot Photo',
+                    text: 'Check out this pet photo I took with PawShot!',
+                    files: [file]
+                })
+                .then(() => {
+                    showNotification('Photo shared!', 'success');
+                })
+                .catch(error => {
+                    console.log('Error sharing:', error);
+                    showNotification('Could not share photo', 'error');
+                });
+            });
+    } else {
+        // Fallback for browsers without Web Share API
+        showNotification('Sharing not supported on this browser', 'error');
         
-        // Add vignette effect
-        function addVignette(context, width, height, intensity = 0.5, size = 0.4) {
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2)) / 2;
-            
-            // Create radial gradient
-            const gradient = context.createRadialGradient(
-                centerX, centerY, radius * size,
-                centerX, centerY, radius
-            );
-            
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            gradient.addColorStop(1, `rgba(0, 0, 0, ${intensity})`);
-            
-            // Draw vignette
-            context.globalCompositeOperation = 'multiply';
-            context.fillStyle = gradient;
-            context.fillRect(0, 0, width, height);
-            context.globalCompositeOperation = 'source-over';
-        }
-        
-        // Add noise effect
-        function addNoise(context, width, height, intensity = 20) {
-            const imageData = context.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                const noise = (Math.random() - 0.5) * intensity;
-                
-                data[i] = Math.max(0, Math.min(255, data[i] + noise));
-                data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-                data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
-            }
-            
-            context.putImageData(imageData, 0, 0);
-        }
-        
-        // Add color tint
-        function addColorTint(context, width, height, r, g, b, strength = 0.3) {
-            context.globalCompositeOperation = 'overlay';
-            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${strength})`;
-            context.fillRect(0, 0, width, height);
-            context.globalCompositeOperation = 'source-over';
-        }
-        
-        // Start timer countdown
-        function startTimer() {
-            if (timerActive) return;
-            
-            timerActive = true;
-            timerCountdown = appSettings.timerDuration;
-            
-            // Create countdown display
-            const countdownEl = document.createElement('div');
-            countdownEl.className = 'countdown-display';
-            countdownEl.textContent = timerCountdown;
-            document.body.appendChild(countdownEl);
-            
-            // Play start sound
-            playSound('focus');
-            
-            // Start countdown
-            timerInterval = setInterval(() => {
-                timerCountdown--;
-                
-                if (timerCountdown > 0) {
-                    // Update display
-                    countdownEl.textContent = timerCountdown;
-                    
-                    // Play tick sound
-                    playSound('focus');
-                } else {
-                    // Clear interval
-                    clearInterval(timerInterval);
-                    
-                    // Remove countdown display
-                    countdownEl.remove();
-                    
-                    // Take photo
-                    capturePhoto();
-                }
-            }, 1000);
-        }
-        
-        // Flash screen effect
-        function flashScreen() {
-            const flash = document.createElement('div');
-            flash.className = 'screen-flash';
-            document.body.appendChild(flash);
-            
-            // Trigger animation
-            setTimeout(() => {
-                flash.classList.add('active');
-                
-                // Remove after animation
-                setTimeout(() => {
-                    flash.remove();
-                }, 300);
-            }, 10);
-        }
-        
-        // Start burst mode
-        function startBurstMode() {
-            if (burstModeActive) return;
-            
-            burstModeActive = true;
-            
-            // Show burst indicator
-            const burstIndicator = document.createElement('div');
-            burstIndicator.className = 'burst-indicator';
-            burstIndicator.textContent = 'BURST';
-            document.body.appendChild(burstIndicator);
-            
-            // Capture first photo
-            capturePhoto();
-            
-            // Set timeout to stop burst after a few seconds
-            setTimeout(() => {
-                stopBurstMode();
-            }, 3000);
-        }
-        
-        // Stop burst mode
-        function stopBurstMode() {
-            burstModeActive = false;
-            
-            // Remove burst indicator
-            const indicator = document.querySelector('.burst-indicator');
-            if (indicator) indicator.remove();
-            
-            // Show notification
-            showNotification('Burst captured!', 'success');
-        }
-        
-        // Save photo to gallery
-        function savePhotoToGallery(photoData, mode) {
-            // Create photo object
-            const photo = {
-                id: Date.now(), // Use timestamp as ID
-                data: photoData,
-                date: new Date().toISOString(),
-                mode: mode,
-                filter: currentFilter,
-                favorite: false
-            };
-            
-            // Add to saved photos array
-            savedPhotos.push(photo);
-            
-            // Save to localStorage
+        // Open in new tab as fallback
+        const tab = window.open();
+        tab.document.write(`<img src="${photoData}" alt="PawShot Photo" style="max-width: 100%; height: auto;">`);
+        tab.document.title = 'PawShot Photo';
+    }
+}
+
+// Delete photo
+function deletePhoto(id) {
+    // Confirm deletion
+    if (confirm('Delete this photo?')) {
+        const index = savedPhotos.findIndex(p => p.id === id);
+        if (index !== -1) {
+            savedPhotos.splice(index, 1);
             localStorage.setItem('pawShotGallery', JSON.stringify(savedPhotos));
             
             // Update gallery count
             updateGalleryCount();
             
-            // Show success notification
-            showNotification('Photo captured!', 'success');
-            
-            return photo;
+            // Show notification
+            showNotification('Photo deleted', 'success');
         }
+    }
+}
+
+// Open photo detail view
+function openPhotoDetail(photo) {
+    // Create detail view overlay
+    const detailView = document.createElement('div');
+    detailView.className = 'photo-detail-view';
+    
+    detailView.innerHTML = `
+        <div class="photo-detail-header">
+            <button class="close-detail">
+                <i class="material-icons">close</i>
+            </button>
+            <div class="photo-detail-actions">
+                <button class="edit-photo">
+                    <i class="material-icons">edit</i>
+                </button>
+                <button class="favorite-button ${photo.favorite ? 'active' : ''}">
+                    <i class="material-icons">${photo.favorite ? 'favorite' : 'favorite_border'}</i>
+                </button>
+                <button class="share-photo">
+                    <i class="material-icons">share</i>
+                </button>
+                <button class="delete-photo">
+                    <i class="material-icons">delete</i>
+                </button>
+            </div>
+        </div>
+        <div class="photo-detail-content">
+            <img src="${photo.data}" alt="Pet photo">
+            <div class="photo-metadata">
+                <div class="photo-date">${formatDate(photo.date)}</div>
+                <div class="photo-mode">${modeTitles[photo.mode] || photo.mode}</div>
+                <div class="photo-filter">${photo.filter.charAt(0).toUpperCase() + photo.filter.slice(1)} filter</div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(detailView);
+    
+    // Prevent body scrolling
+    document.body.style.overflow = 'hidden';
+    
+    // Add event listeners
+    detailView.querySelector('.close-detail').addEventListener('click', () => {
+        detailView.remove();
+        document.body.style.overflow = '';
+    });
+    
+    detailView.querySelector('.favorite-button').addEventListener('click', function() {
+        toggleFavorite(photo.id);
+        this.classList.toggle('active');
+        this.querySelector('i').textContent = this.classList.contains('active') ? 'favorite' : 'favorite_border';
         
-        // Update gallery count display
-        function updateGalleryCount() {
-            const countElement = document.querySelector('.gallery-count');
-            if (countElement) {
-                countElement.textContent = savedPhotos.length;
-            }
-        }
-        
-        // Render gallery
-        function renderGallery() {
-            const galleryGrid = document.querySelector('.gallery-grid');
-            if (!galleryGrid) return;
-            
-            // Clear existing items
-            galleryGrid.innerHTML = '';
-            
-            // If no photos, show empty state
-            if (savedPhotos.length === 0) {
-                galleryGrid.innerHTML = `
-                    <div class="empty-gallery">
-                        <i class="material-icons">photo_library</i>
-                        <p>No photos yet</p>
-                        <p>Capture some pet moments!</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            // Sort photos by date (newest first)
-            const sortedPhotos = [...savedPhotos].sort((a, b) => {
-                return new Date(b.date) - new Date(a.date);
-            });
-            
-            // Create gallery items
-            sortedPhotos.forEach(photo => {
-                const item = document.createElement('div');
-                item.className = 'gallery-item';
-                item.dataset.id = photo.id;
-                
-                item.innerHTML = `
-                    <img src="${photo.data}" alt="Pet photo">
-                    <div class="gallery-item-overlay">
-                        <button class="favorite-button ${photo.favorite ? 'active' : ''}">
-                            <i class="material-icons">${photo.favorite ? 'favorite' : 'favorite_border'}</i>
-                        </button>
-                        <button class="share-button">
-                            <i class="material-icons">share</i>
-                        </button>
-                        <button class="delete-button">
-                            <i class="material-icons">delete</i>
-                        </button>
-                    </div>
-                    <div class="photo-info">
-                        <span class="photo-date">${formatDate(photo.date)}</span>
-                        <span class="photo-mode">${modeTitles[photo.mode] || photo.mode}</span>
-                    </div>
-                `;
-                
-                galleryGrid.appendChild(item);
-                
-                // Add event listeners
-                const favoriteBtn = item.querySelector('.favorite-button');
-                favoriteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    toggleFavorite(photo.id);
-                    favoriteBtn.classList.toggle('active');
-                    favoriteBtn.querySelector('i').textContent = favoriteBtn.classList.contains('active') ? 'favorite' : 'favorite_border';
-                });
-                
-                const shareBtn = item.querySelector('.share-button');
-                shareBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    sharePhoto(photo.data);
-                });
-                
-                const deleteBtn = item.querySelector('.delete-button');
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deletePhoto(photo.id);
-                    item.remove();
-                    
-                    // Check if gallery is now empty
-                    if (savedPhotos.length === 0) {
-                        renderGallery();
-                    }
-                });
-                
-                // Open photo detail view when clicked
-                item.addEventListener('click', () => {
-                    openPhotoDetail(photo);
-                });
-            });
-        }
-        
-        // Format date for display
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            
-            const isToday = date.toDateString() === now.toDateString();
-            
-            if (isToday) {
-                return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-            } else {
-                return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + 
-                       ` at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-            }
-        }
-        
-        // Toggle favorite status
-        function toggleFavorite(id) {
-            const index = savedPhotos.findIndex(p => p.id === id);
-            if (index !== -1) {
-                savedPhotos[index].favorite = !savedPhotos[index].favorite;
-                localStorage.setItem('pawShotGallery', JSON.stringify(savedPhotos));
-            }
-        }
-        
-        // Share photo
-        function sharePhoto(photoData) {
-            if (navigator.share) {
-                // Convert base64 to blob
-                fetch(photoData)
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const file = new File([blob], 'pawshot-photo.jpg', { type: 'image/jpeg' });
-                        
-                        navigator.share({
-                            title: 'PawShot Photo',
-                            text: 'Check out this pet photo I took with PawShot!',
-                            files: [file]
-                        })
-                        .then(() => {
-                            showNotification('Photo shared!', 'success');
-                        })
-                        .catch(error => {
-                            console.log('Error sharing:', error);
-                            showNotification('Could not share photo', 'error');
-                        });
-                    });
-            } else {
-                // Fallback for browsers without Web Share API
-                showNotification('Sharing not supported on this browser', 'error');
-                
-                // Open in new tab as fallback
-                const tab = window.open();
-                tab.document.write(`<img src="${photoData}" alt="PawShot Photo" style="max-width: 100%; height: auto;">`);
-                tab.document.title = 'PawShot Photo';
-            }
-        }
-        
-        // Delete photo
-        function deletePhoto(id) {
-            // Confirm deletion
-            if (confirm('Delete this photo?')) {
-                const index = savedPhotos.findIndex(p => p.id === id);
-                if (index !== -1) {
-                    savedPhotos.splice(index, 1);
-                    localStorage.setItem('pawShotGallery', JSON.stringify(savedPhotos));
-                    
-                    // Update gallery count
-                    updateGalleryCount();
-                    
-                    // Show notification
-                    showNotification('Photo deleted', 'success');
-                }
-            }
-        }
-        
-        // Open photo detail view
-        function openPhotoDetail(photo) {
-            // Create detail view overlay
-            const detailView = document.createElement('div');
-            detailView.className = 'photo-detail-view';
-            
-            detailView.innerHTML = `
-                <div class="photo-detail-header">
-                    <button class="close-detail">
-                        <i class="material-icons">close</i>
-                    </button>
-                    <div class="photo-detail-actions">
-                        <button class="edit-photo">
-                            <i class="material-icons">edit</i>
-                        </button>
-                        <button class="favorite-button ${photo.favorite ? 'active' : ''}">
-                            <i class="material-icons">${photo.favorite ? 'favorite' : 'favorite_border'}</i>
-                        </button>
-                        <button class="share-photo">
-                            <i class="material-icons">share</i>
-                        </button>
-                        <button class="delete-photo">
-                            <i class="material-icons">delete</i>
-                        </button>
-                    </div>
-                </div>
-                <div class="photo-detail-content">
-                    <img src="${photo.data}" alt="Pet photo">
-                    <div class="photo-metadata">
-                        <div class="photo-date">${formatDate(photo.date)}</div>
-                        <div class="photo-mode">${modeTitles[photo.mode] || photo.mode}</div>
-                        <div class="photo-filter">${photo.filter.charAt(0).toUpperCase() + photo.filter.slice(1)} filter</div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(detailView);
-            
-            // Prevent body scrolling
-            document.body.style.overflow = 'hidden';
-            
-            // Add event listeners
-            detailView.querySelector('.close-detail').addEventListener('click', () => {
-                detailView.remove();
-                document.body.style.overflow = '';
-            });
-            
-            detailView.querySelector('.favorite-button').addEventListener('click', function() {
-                toggleFavorite(photo.id);
-                this.classList.toggle('active');
-                this.querySelector('i').textContent = this.classList.contains('active') ? 'favorite' : 'favorite_border';
-                
-                // Update gallery view in background
-                renderGallery();
-            });
-            
-            detailView.querySelector('.share-photo').addEventListener('click', () => {
-                sharePhoto(photo.data);
-            });
-            
-            detailView.querySelector('.delete-photo').addEventListener('click', () => {
-                deletePhoto(photo.id);
-                detailView.remove();
-                document.body.style.overflow = '';
-                renderGallery();
-            });
-            
-            detailView.querySelector('.edit-photo').addEventListener('click', () => {
-                openPhotoEditor(photo);
-                detailView.remove();
-            });
-        }
-        
-        // Open photo editor
-        function openPhotoEditor(photo) {
-            // Create editor overlay
-            const editorView = document.createElement('div');
-            editorView.className = 'photo-editor-view';
-            
-            editorView.innerHTML = `
+        // Update gallery view in background
+        renderGallery();
+    });
+    
+    detailView.querySelector('.share-photo').addEventListener('click', () => {
+        sharePhoto(photo.data);
+    });
+    
+    detailView.querySelector('.delete-photo').addEventListener('click', () => {
+        deletePhoto(photo.id);
+        detailView.remove();
+        document.body.style.overflow = '';
+        renderGallery();
+    });
+    
+    detailView.querySelector('.edit-photo').addEventListener('click', () => {
+        openPhotoEditor(photo);
+        detailView.remove();
+    });
+}
+
+// Open photo editor
+function openPhotoEditor(photo) {
+    // Create editor overlay
+    const editorView = document.createElement('div');
+    editorView.className = 'photo-editor-view';
+    
+    editorView.innerHTML = `
                 <div class="editor-header">
-                    <button class="close-editor">
-                        <i class="material-icons">close</i>
-                    </button>
-                    <h2>Edit Photo</h2>
-                    <button class="save-edit">
-                        <i class="material-icons">check</i>
-                    </button>
-                </div>
-                        <div class="editor-content">
+            <button class="close-editor">
+                <i class="material-icons">close</i>
+            </button>
+            <h2>Edit Photo</h2>
+            <button class="save-edit">
+                <i class="material-icons">check</i>
+            </button>
+        </div>
+        <div class="editor-content">
             <canvas id="editor-canvas"></canvas>
             <div class="editor-controls">
                 <div class="editor-control">
@@ -1599,685 +1604,627 @@ function showFocusIndicator(x, y) {
     
     document.body.appendChild(indicator);
     
-        // Add active class after a small delay for animation
+    // Add active class after a small delay for animation
+    setTimeout(() => {
+        indicator.classList.add('active');
+    }, 10);
+    
+    // Remove the indicator after animation
+    setTimeout(() => {
+        indicator.classList.remove('active');
         setTimeout(() => {
-            indicator.classList.add('active');
-        }, 10);
-        
-        // Remove the indicator after animation
-        setTimeout(() => {
-            indicator.classList.remove('active');
-            setTimeout(() => {
-                indicator.remove();
-            }, 300);
-        }, 2000);
+            indicator.remove();
+        }, 300);
+    }, 2000);
+}
+
+// Apply mode settings
+function applyModeSettings(mode) {
+    // Update mode indicator
+    const modeIndicator = document.querySelector('.mode-indicator');
+    if (modeIndicator) {
+        modeIndicator.textContent = modeTitles[mode] || mode;
     }
     
-    // Apply mode settings
-    function applyModeSettings(mode) {
-        // Update mode indicator
-        const modeIndicator = document.querySelector('.mode-indicator');
-        if (modeIndicator) {
-            modeIndicator.textContent = modeTitles[mode] || mode;
-        }
-        
-        // Reset any active mode states
-        if (burstModeActive) {
-            stopBurstMode();
-        }
-        
-        if (timerActive) {
-            clearInterval(timerInterval);
-            timerActive = false;
-            
-            const countdownEl = document.querySelector('.countdown-display');
-            if (countdownEl) countdownEl.remove();
-        }
-        
-        // Apply specific mode settings
-        if (videoTrack) {
-            try {
-                const capabilities = videoTrack.getCapabilities();
-                const settings = {};
-                
-                switch (mode) {
-                    case 'normal':
-                        // Standard settings
-                        if (capabilities.exposureMode) settings.exposureMode = 'continuous';
-                        if (capabilities.whiteBalanceMode) settings.whiteBalanceMode = 'continuous';
-                        break;
-                        
-                    case 'portrait':
-                        // Better for portraits with ideal exposure
-                        if (capabilities.exposureMode) settings.exposureMode = 'continuous';
-                        if (capabilities.exposureCompensation) settings.exposureCompensation = 0.3; // Slight overexposure for faces
-                        break;
-                        
-                    case 'night':
-                        // Longer exposure for better night shots
-                        if (capabilities.exposureMode) settings.exposureMode = 'manual';
-                        if (capabilities.exposureTime) {
-                            // Try to set a longer exposure time
-                            const maxTime = capabilities.exposureTime.max;
-                            settings.exposureTime = Math.min(maxTime, 0.25); // 1/4 second if possible
-                        }
-                        break;
-                        
-                    case 'action':
-                        // Faster shutter speed for moving subjects
-                        if (capabilities.exposureMode) settings.exposureMode = 'manual';
-                        if (capabilities.exposureTime) {
-                            // Try to set a shorter exposure time
-                            const minTime = capabilities.exposureTime.min;
-                            settings.exposureTime = minTime; // Fastest possible
-                        }
-                        break;
-                        
-                    case 'selfie':
-                        // Change to front camera if we're not already using it
-                        if (facingMode !== 'user') {
-                            // Stop current camera and switch to front
-                            facingMode = 'user';
-                            stopCamera().then(() => initCamera());
-                            return;
-                        }
-                        break;
-                        
-                    case 'burst':
-                        // Will activate burst mode when taking photos
-                        // Just set standard settings for now
-                        if (capabilities.exposureMode) settings.exposureMode = 'continuous';
-                        break;
-                        
-                    case 'paw':
-                        // Standard settings, special paw effect added during processing
-                        if (capabilities.exposureMode) settings.exposureMode = 'continuous';
-                        if (capabilities.whiteBalanceMode) settings.whiteBalanceMode = 'continuous';
-                        break;
-                }
-                
-                // Apply settings if we have any
-                if (Object.keys(settings).length > 0) {
-                    videoTrack.applyConstraints({ advanced: [settings] });
-                }
-            } catch (e) {
-                console.log('Mode settings not supported:', e);
-            }
-        }
+    // Reset any active mode states
+    if (burstModeActive) {
+        stopBurstMode();
     }
     
-    // Switch camera
-    function toggleCamera() {
-        facingMode = facingMode === 'environment' ? 'user' : 'environment';
-        stopCamera().then(() => initCamera());
+    if (timerActive) {
+        clearInterval(timerInterval);
+        timerActive = false;
+        
+        const countdownEl = document.querySelector('.countdown-display');
+        if (countdownEl) countdownEl.remove();
     }
     
-    // Toggle flash mode
-    function toggleFlash() {
-        if (!videoTrack) return;
-        
-        // Cycle through flash modes
-        const modes = ['off', 'on', 'auto'];
-        const currentIndex = modes.indexOf(flashMode);
-        flashMode = modes[(currentIndex + 1) % modes.length];
-        
+    // Apply specific mode settings
+    if (videoTrack) {
         try {
-            // Apply flash settings if supported
             const capabilities = videoTrack.getCapabilities();
-            if (capabilities.torch) {
-                videoTrack.applyConstraints({
-                    advanced: [{ torch: flashMode === 'on' }]
-                });
+            const settings = {};
+            
+            switch (mode) {
+                case 'normal':
+                    // Standard settings
+                    if (capabilities.exposureMode) settings.exposureMode = 'continuous';
+                    if (capabilities.whiteBalanceMode) settings.whiteBalanceMode = 'continuous';
+                    break;
+                    
+                case 'portrait':
+                    // Better for portraits with ideal exposure
+                    if (capabilities.exposureMode) settings.exposureMode = 'continuous';
+                    if (capabilities.exposureCompensation) settings.exposureCompensation = 0.3; // Slight overexposure for faces
+                    break;
+                    
+                case 'night':
+                    // Longer exposure for better night shots
+                    if (capabilities.exposureMode) settings.exposureMode = 'manual';
+                    if (capabilities.exposureTime) {
+                        // Try to set a longer exposure time
+                        const maxTime = capabilities.exposureTime.max;
+                        settings.exposureTime = Math.min(maxTime, 0.25); // 1/4 second if possible
+                    }
+                    break;
+                    
+                case 'action':
+                    // Faster shutter speed for moving subjects
+                    if (capabilities.exposureMode) settings.exposureMode = 'manual';
+                    if (capabilities.exposureTime) {
+                        // Try to set a shorter exposure time
+                        const minTime = capabilities.exposureTime.min;
+                        settings.exposureTime = minTime; // Fastest possible
+                    }
+                    break;
+                    
+                case 'selfie':
+                    // Change to front camera if we're not already using it
+                    if (facingMode !== 'user') {
+                        // Stop current camera and switch to front
+                        facingMode = 'user';
+                        stopCamera().then(() => initCamera());
+                        return;
+                    }
+                    break;
+                    
+                case 'burst':
+                    // Will activate burst mode when taking photos
+                    // Just set standard settings for now
+                    if (capabilities.exposureMode) settings.exposureMode = 'continuous';
+                    break;
+                    
+                case 'paw':
+                    // Standard settings, special paw effect added during processing
+                    if (capabilities.exposureMode) settings.exposureMode = 'continuous';
+                    if (capabilities.whiteBalanceMode) settings.whiteBalanceMode = 'continuous';
+                    break;
+            }
+            
+            // Apply settings if we have any
+            if (Object.keys(settings).length > 0) {
+                videoTrack.applyConstraints({ advanced: [settings] });
             }
         } catch (e) {
-            console.log('Flash not supported:', e);
-        }
-        
-        // Update flash button UI
-        const flashButton = document.querySelector('.flash-toggle i');
-        if (flashButton) {
-            let iconName = 'flash_off';
-            if (flashMode === 'on') iconName = 'flash_on';
-            if (flashMode === 'auto') iconName = 'flash_auto';
-            
-            flashButton.textContent = iconName;
+            console.log('Mode settings not supported:', e);
         }
     }
+}
+
+// Switch camera
+function toggleCamera() {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    stopCamera().then(() => initCamera());
+}
+
+// Toggle flash mode
+function toggleFlash() {
+    if (!videoTrack) return;
     
-    // Toggle grid overlay
-    function toggleGrid() {
-        const gridOverlay = document.querySelector('.grid-overlay');
-        if (gridOverlay) {
-            const isVisible = gridOverlay.style.display !== 'none';
-            gridOverlay.style.display = isVisible ? 'none' : 'block';
-            
-            // Update grid button
-            const gridButton = document.querySelector('.grid-toggle i');
-            if (gridButton) {
-                gridButton.textContent = isVisible ? 'grid_on' : 'grid_off';
-            }
+    // Cycle through flash modes
+    const modes = ['off', 'on', 'auto'];
+    const currentIndex = modes.indexOf(flashMode);
+    flashMode = modes[(currentIndex + 1) % modes.length];
+    
+    try {
+        // Apply flash settings if supported
+        const capabilities = videoTrack.getCapabilities();
+        if (capabilities.torch) {
+            videoTrack.applyConstraints({
+                advanced: [{ torch: flashMode === 'on' }]
+            });
         }
+    } catch (e) {
+        console.log('Flash not supported:', e);
     }
     
-    // Toggle timer
-    function toggleTimer() {
-        // Cycle through options: off, 3s, 5s, 10s
-        const timerOptions = [0, 3, 5, 10];
-        const currentIndex = timerOptions.indexOf(appSettings.timerDuration);
-        appSettings.timerDuration = timerOptions[(currentIndex + 1) % timerOptions.length];
+    // Update flash button UI
+    const flashButton = document.querySelector('.flash-toggle i');
+    if (flashButton) {
+        let iconName = 'flash_off';
+        if (flashMode === 'on') iconName = 'flash_on';
+        if (flashMode === 'auto') iconName = 'flash_auto';
         
-        // Save settings
+        flashButton.textContent = iconName;
+    }
+}
+
+// Toggle grid overlay
+function toggleGrid() {
+    const gridOverlay = document.querySelector('.grid-overlay');
+    if (gridOverlay) {
+        const isVisible = gridOverlay.style.display !== 'none';
+        gridOverlay.style.display = isVisible ? 'none' : 'block';
+        
+        // Update grid button
+        const gridButton = document.querySelector('.grid-toggle i');
+        if (gridButton) {
+            gridButton.textContent = isVisible ? 'grid_on' : 'grid_off';
+        }
+    }
+}
+
+// Toggle timer
+function toggleTimer() {
+    // Cycle through options: off, 3s, 5s, 10s
+    const timerOptions = [0, 3, 5, 10];
+    const currentIndex = timerOptions.indexOf(appSettings.timerDuration);
+    appSettings.timerDuration = timerOptions[(currentIndex + 1) % timerOptions.length];
+    
+    // Save settings
+    localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
+    
+    // Update timer button
+    const timerButton = document.querySelector('.timer-toggle span');
+    if (timerButton) {
+        timerButton.textContent = appSettings.timerDuration === 0 ? 'Off' : `${appSettings.timerDuration}s`;
+    }
+}
+
+// Open settings
+function openSettings() {
+    // Create settings overlay
+    const settingsView = document.createElement('div');
+    settingsView.className = 'settings-view';
+    
+    settingsView.innerHTML = `
+        <div class="settings-header">
+            <button class="close-settings">
+                <i class="material-icons">close</i>
+            </button>
+            <h2>Settings</h2>
+        </div>
+        <div class="settings-content">
+            <div class="settings-section">
+                <h3>Camera</h3>
+                <div class="setting-item">
+                    <label>High quality photos</label>
+                    <label class="switch">
+                        <input type="checkbox" class="quality-toggle" ${appSettings.highQuality ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>Save location data</label>
+                    <label class="switch">
+                        <input type="checkbox" class="location-toggle" ${appSettings.saveLocation ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>Camera sounds</label>
+                    <label class="switch">
+                        <input type="checkbox" class="sounds-toggle" ${appSettings.cameraSounds ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>About</h3>
+                <div class="about-info">
+                    <p>PawShot v1.0</p>
+                    <p>The ultimate pet photography app</p>
+                    <p>© 2023 PawShot</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(settingsView);
+    
+    // Add event listeners
+    settingsView.querySelector('.close-settings').addEventListener('click', () => {
+        settingsView.remove();
+    });
+    
+    settingsView.querySelector('.quality-toggle').addEventListener('change', function() {
+        appSettings.highQuality = this.checked;
         localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
-        
-        // Update timer button
-        const timerButton = document.querySelector('.timer-toggle span');
-        if (timerButton) {
-            timerButton.textContent = appSettings.timerDuration === 0 ? 'Off' : `${appSettings.timerDuration}s`;
-        }
+    });
+    
+    settingsView.querySelector('.location-toggle').addEventListener('change', function() {
+        appSettings.saveLocation = this.checked;
+        localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
+    });
+    
+    settingsView.querySelector('.sounds-toggle').addEventListener('change', function() {
+        appSettings.cameraSounds = this.checked;
+        localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
+    });
+}
+
+// Play camera sound
+function playSound(type) {
+    if (!appSettings.cameraSounds) return;
+    
+    let sound;
+    switch (type) {
+        case 'shutter':
+            sound = new Audio('sounds/shutter.mp3');
+            break;
+        case 'focus':
+            sound = new Audio('sounds/focus.mp3');
+            break;
+        case 'success':
+            sound = new Audio('sounds/success.mp3');
+            break;
     }
     
-    // Open settings
-    function openSettings() {
-        // Create settings overlay
-        const settingsView = document.createElement('div');
-        settingsView.className = 'settings-view';
-        
-        settingsView.innerHTML = `
-            <div class="settings-header">
-                <button class="close-settings">
-                    <i class="material-icons">close</i>
-                </button>
-                <h2>Settings</h2>
-            </div>
-            <div class="settings-content">
-                <div class="settings-section">
-                    <h3>Camera</h3>
-                    <div class="setting-item">
-                        <label>High quality photos</label>
-                        <label class="switch">
-                            <input type="checkbox" class="quality-toggle" ${appSettings.highQuality ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item">
-                        <label>Save location data</label>
-                        <label class="switch">
-                            <input type="checkbox" class="location-toggle" ${appSettings.saveLocation ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item">
-                        <label>Camera sounds</label>
-                        <label class="switch">
-                            <input type="checkbox" class="sounds-toggle" ${appSettings.cameraSounds ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>About</h3>
-                    <div class="about-info">
-                        <p>PawShot v1.0</p>
-                        <p>The ultimate pet photography app</p>
-                        <p>© 2023 PawShot</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(settingsView);
-        
-        // Add event listeners
-        settingsView.querySelector('.close-settings').addEventListener('click', () => {
-            settingsView.remove();
-        });
-        
-        settingsView.querySelector('.quality-toggle').addEventListener('change', function() {
-            appSettings.highQuality = this.checked;
-            localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
-        });
-        
-        settingsView.querySelector('.location-toggle').addEventListener('change', function() {
-            appSettings.saveLocation = this.checked;
-            localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
-        });
-        
-        settingsView.querySelector('.sounds-toggle').addEventListener('change', function() {
-            appSettings.cameraSounds = this.checked;
-            localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
+    if (sound) {
+        sound.play().catch(e => {
+            console.log('Sound playback error:', e);
         });
     }
-    
-    // Play camera sound
-    function playSound(type) {
-        if (!appSettings.cameraSounds) return;
-        
-        let sound;
-        switch (type) {
-            case 'shutter':
-                sound = new Audio('sounds/shutter.mp3');
-                break;
-            case 'focus':
-                sound = new Audio('sounds/focus.mp3');
-                break;
-            case 'success':
-                sound = new Audio('sounds/success.mp3');
-                break;
-        }
-        
-        if (sound) {
-            sound.play().catch(e => {
-                console.log('Sound playback error:', e);
+}
+
+// Toggle fullscreen
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen()
+            .catch(e => {
+                console.log('Fullscreen error:', e);
+                showNotification('Fullscreen not available', 'error');
             });
-        }
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+// Load app settings from storage
+function loadSettings() {
+    const savedSettings = localStorage.getItem('pawShotSettings');
+    if (savedSettings) {
+        appSettings = JSON.parse(savedSettings);
+    } else {
+        // Default settings
+        appSettings = {
+            highQuality: true,
+            saveLocation: false,
+            cameraSounds: true,
+            timerDuration: 0,
+            defaultMode: 'normal',
+            defaultFilter: 'normal',
+            darkMode: false
+        };
+        localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
     }
     
-    // Toggle fullscreen
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen()
-                .catch(e => {
-                    console.log('Fullscreen error:', e);
-                    showNotification('Fullscreen not available', 'error');
-                });
-        } else {
-            document.exitFullscreen();
-        }
+    // Load photos from storage
+    const savedGallery = localStorage.getItem('pawShotGallery');
+    if (savedGallery) {
+        savedPhotos = JSON.parse(savedGallery);
     }
-    
-    // Load app settings from storage
-    function loadSettings() {
-        const savedSettings = localStorage.getItem('pawShotSettings');
-        if (savedSettings) {
-            appSettings = JSON.parse(savedSettings);
-        } else {
-            // Default settings
-            appSettings = {
-                highQuality: true,
-                saveLocation: false,
-                cameraSounds: true,
-                timerDuration: 0,
-                defaultMode: 'normal',
-                defaultFilter: 'normal',
-                darkMode: false
-            };
-            localStorage.setItem('pawShotSettings', JSON.stringify(appSettings));
-        }
+}
+
+// Initialize app
+function initApp() {
+    // Hide splash screen and show app container after loading
+    setTimeout(() => {
+        const splashScreen = document.getElementById('splash-screen');
+        const appContainer = document.getElementById('app-container');
         
-        // Load photos from storage
-        const savedGallery = localStorage.getItem('pawShotGallery');
-        if (savedGallery) {
-            savedPhotos = JSON.parse(savedGallery);
+        if (splashScreen && appContainer) {
+            // Show app container first (but still invisible due to opacity)
+            appContainer.style.display = '';
+            
+            // Add the show class for the transition
+            setTimeout(() => {
+                appContainer.classList.add('show');
+                
+                // Hide splash screen after app container transition starts
+                setTimeout(() => {
+                    splashScreen.style.display = 'none';
+                }, 100);
+            }, 50);
         }
+    }, 2000); // Wait for animation to complete
+    
+    // Load settings
+    loadSettings();
+    
+    // Set up camera
+    initCamera();
+    
+    // Update gallery count
+    updateGalleryCount();
+    
+    // Add event listeners
+    setupEventListeners();
+    
+    // Update timer button
+    const timerButton = document.querySelector('.timer-toggle span');
+    if (timerButton) {
+        timerButton.textContent = appSettings.timerDuration === 0 ? 'Off' : `${appSettings.timerDuration}s`;
     }
-    
-    // Initialize app
-    function initApp() {
-        // Load settings
-        loadSettings();
-        
-        // Set up camera
-        initCamera();
-        
-        // Update gallery count
-        updateGalleryCount();
-        
-        // Add event listeners
-        setupEventListeners();
-        
-        // Update timer button
-        const timerButton = document.querySelector('.timer-toggle span');
-        if (timerButton) {
-            timerButton.textContent = appSettings.timerDuration === 0 ? 'Off' : `${appSettings.timerDuration}s`;
-        }
-    }
-    
-    // Set up event listeners
-    function setupEventListeners() {
-        try {
-            // Capture button
-            const captureButton = document.querySelector('.capture-button');
-            if (captureButton) {
-                captureButton.addEventListener('click', () => {
-                    if (currentMode === 'burst') {
-                        startBurstMode();
-                    } else {
-                        capturePhoto();
-                    }
-                });
-            }
-            
-            // Camera toggle
-            const cameraToggle = document.querySelector('.camera-toggle');
-            if (cameraToggle) {
-                cameraToggle.addEventListener('click', toggleCamera);
-            }
-            
-            // Flash toggle
-            const flashToggle = document.querySelector('.flash-toggle');
-            if (flashToggle) {
-                flashToggle.addEventListener('click', toggleFlash);
-            }
-            
-            // Grid toggle
-            const gridToggle = document.querySelector('.grid-toggle');
-            if (gridToggle) {
-                gridToggle.addEventListener('click', toggleGrid);
-            }
-            
-            // Timer toggle
-            const timerToggle = document.querySelector('.timer-toggle');
-            if (timerToggle) {
-                timerToggle.addEventListener('click', toggleTimer);
-            }
-            
-            // Gallery button
-            const galleryButton = document.querySelector('.gallery-button');
-            if (galleryButton) {
-                galleryButton.addEventListener('click', () => {
-                    // Show gallery view
-                    const galleryView = document.querySelector('.gallery-view');
-                    if (galleryView) {
-                        galleryView.classList.remove('hidden');
-                        
-                        // Render gallery
-                        renderGallery();
-                    }
-                });
-            }
-            
-            // Back to camera button
-            const backButton = document.querySelector('.back-to-camera');
-            if (backButton) {
-                backButton.addEventListener('click', () => {
-                    // Hide gallery view
-                    const galleryView = document.querySelector('.gallery-view');
-                    if (galleryView) {
-                        galleryView.classList.add('hidden');
-                    }
-                });
-            }
-            
-            // Settings button
-            const settingsButton = document.querySelector('.settings-button');
-            if (settingsButton) {
-                settingsButton.addEventListener('click', openSettings);
-            }
-            
-            // Mode switches
-            const modeOptions = document.querySelectorAll('.mode-switch-item');
-            modeOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    // Update UI
-                    modeOptions.forEach(opt => opt.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Update current mode
-                    currentMode = this.dataset.mode;
-                    
-                    // Apply mode settings
-                    applyModeSettings(currentMode);
-                });
-            });
-            
-            // Filter options
-            const filterOptions = document.querySelectorAll('.filter-option');
-            filterOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    // Update UI
-                    filterOptions.forEach(opt => opt.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Update current filter
-                    currentFilter = this.dataset.filter;
-                });
-            });
-            
-            // Focus on tap
-            const cameraView = document.querySelector('.camera-view');
-            if (cameraView) {
-                cameraView.addEventListener('click', function(e) {
-                    if (!viewfinder) return;
-                    
-                    // Calculate relative position
-                    const viewfinderRect = viewfinder.getBoundingClientRect();
-                    const x = (e.clientX - viewfinderRect.left) / viewfinderRect.width;
-                    const y = (e.clientY - viewfinderRect.top) / viewfinderRect.height;
-                    
-                    // Focus camera at this point
-                    focusCamera(x, y);
-                    
-                    // Show focus indicator
-                    showFocusIndicator(e.clientX, e.clientY);
-                });
-            }
-            
-                    // Window resize handler
-        window.addEventListener('resize', resizeCanvas);
-        
-        // Orientation change handler
-        window.addEventListener('orientationchange', () => {
-            // Delay resize slightly to account for transition
-            setTimeout(resizeCanvas, 300);
-        });
-        
-        // Handle keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Space bar = capture photo
-            if (e.code === 'Space') {
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    try {
+        // Capture button
+        const captureButton = document.querySelector('.capture-button');
+        if (captureButton) {
+            captureButton.addEventListener('click', () => {
                 if (currentMode === 'burst') {
                     startBurstMode();
                 } else {
                     capturePhoto();
                 }
-            }
-            
-            // 'F' toggle flash
-            if (e.code === 'KeyF') {
-                toggleFlash();
-            }
-            
-            // 'G' toggle grid
-            if (e.code === 'KeyG') {
-                toggleGrid();
-            }
-            
-            // 'T' toggle timer
-            if (e.code === 'KeyT') {
-                toggleTimer();
-            }
-            
-            // 'C' toggle camera
-            if (e.code === 'KeyC') {
-                toggleCamera();
-            }
+            });
+        }
+        
+        // Camera toggle
+        const cameraToggle = document.querySelector('.camera-toggle');
+        if (cameraToggle) {
+            cameraToggle.addEventListener('click', toggleCamera);
+        }
+        
+        // Flash toggle
+        const flashToggle = document.querySelector('.flash-toggle');
+        if (flashToggle) {
+            flashToggle.addEventListener('click', toggleFlash);
+        }
+        
+        // Grid toggle
+        const gridToggle = document.querySelector('.grid-toggle');
+        if (gridToggle) {
+            gridToggle.addEventListener('click', toggleGrid);
+        }
+        
+        // Timer toggle
+        const timerToggle = document.querySelector('.timer-toggle');
+        if (timerToggle) {
+            timerToggle.addEventListener('click', toggleTimer);
+        }
+        
+        // Gallery button
+        const galleryButton = document.querySelector('.gallery-button');
+        if (galleryButton) {
+            galleryButton.addEventListener('click', () => {
+                // Show gallery view
+                const galleryView = document.querySelector('.gallery-view');
+                if (galleryView) {
+                    galleryView.classList.remove('hidden');
+                    
+                    // Render gallery
+                    renderGallery();
+                }
+            });
+        }
+        
+        // Back to camera button
+        const backButton = document.querySelector('.back-to-camera');
+        if (backButton) {
+            backButton.addEventListener('click', () => {
+                // Hide gallery view
+                const galleryView = document.querySelector('.gallery-view');
+                if (galleryView) {
+                    galleryView.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Settings button
+        const settingsButton = document.querySelector('.settings-button');
+        if (settingsButton) {
+            settingsButton.addEventListener('click', openSettings);
+        }
+        
+        // Mode switches
+        const modeOptions = document.querySelectorAll('.mode-switch-item');
+        modeOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                // Update UI
+                modeOptions.forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update current mode
+                currentMode = this.dataset.mode;
+                
+                // Apply mode settings
+                applyModeSettings(currentMode);
+            });
         });
         
-        // Check if the app is installed as PWA
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent Chrome 76+ from automatically showing the prompt
-            e.preventDefault();
-            
-            // Stash the event so it can be triggered later
-            deferredInstallPrompt = e;
-            
-            // Show install button if available
-            const installButton = document.querySelector('.install-app');
-            if (installButton) {
-                installButton.classList.remove('hidden');
-                installButton.addEventListener('click', () => {
-                    // Show the install prompt
-                    deferredInstallPrompt.prompt();
-                    
-                    // Wait for the user to respond to the prompt
-                    deferredInstallPrompt.userChoice.then((choiceResult) => {
-                        if (choiceResult.outcome === 'accepted') {
-                            console.log('User accepted the install prompt');
-                            showNotification('App installation started', 'success');
-                        } else {
-                            console.log('User dismissed the install prompt');
-                        }
+                // Filter options
+                const filterOptions = document.querySelectorAll('.filter-option');
+                filterOptions.forEach(option => {
+                    option.addEventListener('click', function() {
+                        // Update UI
+                        filterOptions.forEach(opt => opt.classList.remove('active'));
+                        this.classList.add('active');
                         
-                        // Clear the saved prompt since it can't be used again
-                        deferredInstallPrompt = null;
-                        
-                        // Hide install button
-                        installButton.classList.add('hidden');
+                        // Update current filter
+                        currentFilter = this.dataset.filter;
                     });
                 });
-            }
-        });
-        
-        // Hide the address bar on mobile
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                window.scrollTo(0, 1);
-            }, 100);
-        });
-        
-        // Handle visibility change to restart camera if needed
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible' && !streamActive && viewfinder) {
-                // Restart camera if it was stopped
-                initCamera();
-            }
-            
-            if (document.visibilityState === 'hidden' && streamActive) {
-                // Optionally stop camera to save battery
-                if (appSettings.saveOnBattery) {
-                    stopCamera();
+                
+                // Focus on tap
+                const cameraView = document.querySelector('.camera-view');
+                if (cameraView) {
+                    cameraView.addEventListener('click', function(e) {
+                        if (!viewfinder) return;
+                        
+                        // Calculate relative position
+                        const viewfinderRect = viewfinder.getBoundingClientRect();
+                        const x = (e.clientX - viewfinderRect.left) / viewfinderRect.width;
+                        const y = (e.clientY - viewfinderRect.top) / viewfinderRect.height;
+                        
+                        // Focus camera at this point
+                        focusCamera(x, y);
+                        
+                        // Show focus indicator
+                        showFocusIndicator(e.clientX, e.clientY);
+                    });
                 }
+                
+                // Window resize handler
+                window.addEventListener('resize', resizeCanvas);
+                
+                // Orientation change handler
+                window.addEventListener('orientationchange', () => {
+                    // Delay resize slightly to account for transition
+                    setTimeout(resizeCanvas, 300);
+                });
+                
+                // Handle keyboard shortcuts
+                document.addEventListener('keydown', function(e) {
+                    // Space bar = capture photo
+                    if (e.code === 'Space') {
+                        if (currentMode === 'burst') {
+                            startBurstMode();
+                        } else {
+                            capturePhoto();
+                        }
+                    }
+                    
+                    // 'F' toggle flash
+                    if (e.code === 'KeyF') {
+                        toggleFlash();
+                    }
+                    
+                    // 'G' toggle grid
+                    if (e.code === 'KeyG') {
+                        toggleGrid();
+                    }
+                    
+                    // 'T' toggle timer
+                    if (e.code === 'KeyT') {
+                        toggleTimer();
+                    }
+                    
+                    // 'C' toggle camera
+                    if (e.code === 'KeyC') {
+                        toggleCamera();
+                    }
+                });
+                
+                // Check if the app is installed as PWA
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    // Prevent Chrome 76+ from automatically showing the prompt
+                    e.preventDefault();
+                    
+                    // Stash the event so it can be triggered later
+                    deferredInstallPrompt = e;
+                    
+                    // Show install button if available
+                    const installButton = document.querySelector('.install-app');
+                    if (installButton) {
+                        installButton.classList.remove('hidden');
+                        installButton.addEventListener('click', () => {
+                            // Show the install prompt
+                            deferredInstallPrompt.prompt();
+                            
+                            // Wait for the user to respond to the prompt
+                            deferredInstallPrompt.userChoice.then((choiceResult) => {
+                                if (choiceResult.outcome === 'accepted') {
+                                    console.log('User accepted the install prompt');
+                                    showNotification('App installation started', 'success');
+                                } else {
+                                    console.log('User dismissed the install prompt');
+                                }
+                                
+                                // Clear the saved prompt since it can't be used again
+                                deferredInstallPrompt = null;
+                                
+                                // Hide install button
+                                installButton.classList.add('hidden');
+                            });
+                        });
+                    }
+                });
+                
+                // Hide the address bar on mobile
+                window.addEventListener('load', function() {
+                    setTimeout(function() {
+                        window.scrollTo(0, 1);
+                    }, 100);
+                });
+                
+                // Handle visibility change to restart camera if needed
+                document.addEventListener('visibilitychange', function() {
+                    if (document.visibilityState === 'visible' && !videoStream && viewfinder) {
+                        // Restart camera if it was stopped
+                        initCamera();
+                    }
+                    
+                    if (document.visibilityState === 'hidden' && videoStream) {
+                        // Optionally stop camera to save battery
+                        if (appSettings.saveOnBattery) {
+                            stopCamera();
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('Error setting up event listeners:', e);
+                showNotification('Error initializing app', 'error');
             }
-        });
-    } catch (e) {
-        console.error('Error setting up event listeners:', e);
-        showNotification('Error initializing app', 'error');
-    }
-}
-
-// Resize canvas to match viewfinder
-function resizeCanvas() {
-    if (!viewfinder || !canvas) return;
-    
-    // Match canvas size to video element size
-    const viewfinderRect = viewfinder.getBoundingClientRect();
-    canvas.width = viewfinderRect.width;
-    canvas.height = viewfinderRect.height;
-    
-    // Update grid overlay size if it exists
-    const gridOverlay = document.querySelector('.grid-overlay');
-    if (gridOverlay) {
-        gridOverlay.style.width = `${viewfinderRect.width}px`;
-        gridOverlay.style.height = `${viewfinderRect.height}px`;
-    }
-}
-
-// Stop camera stream
-function stopCamera() {
-    return new Promise((resolve) => {
-        try {
-            if (stream) {
-                const tracks = stream.getTracks();
-                tracks.forEach(track => track.stop());
-                stream = null;
-                videoTrack = null;
-                streamActive = false;
-            }
-            
-            if (viewfinder) {
-                viewfinder.srcObject = null;
-            }
-            
-            resolve();
-        } catch (e) {
-            console.error('Error stopping camera:', e);
-            resolve();
         }
-    });
-}
-
-// Check if device has flash
-function checkFlashSupport() {
-    if (!videoTrack) return false;
-    
-    try {
-        const capabilities = videoTrack.getCapabilities();
-        return !!capabilities.torch;
-    } catch (e) {
-        return false;
-    }
-}
-
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', initApp);
-
-// Generate a unique device ID for analytics if not already present
-function generateDeviceId() {
-    let deviceId = localStorage.getItem('pawShotDeviceId');
-    if (!deviceId) {
-        deviceId = 'paws_' + Math.random().toString(36).substring(2, 15) + 
-                   Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('pawShotDeviceId', deviceId);
-    }
-    return deviceId;
-}
-
-// Log app usage analytics (in a privacy-preserving way)
-function logAnalytics(action, data = {}) {
-    // Only log analytics if enabled in settings
-    if (!appSettings.allowAnalytics) return;
-    
-    // Basic analytics data
-    const analyticsData = {
-        action,
-        deviceId: generateDeviceId(),
-        timestamp: new Date().toISOString(),
-        appVersion: '1.0',
-        screenSize: `${window.innerWidth}x${window.innerHeight}`,
-        ...data
-    };
-    
-    // In a real app, we would send this data to a server
-    console.log('Analytics:', analyticsData);
-    
-    // Example of how to send to a server:
-    /*
-    fetch('https://analytics.pawshot.app/log', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(analyticsData)
-    }).catch(e => {
-        // Fail silently - analytics shouldn't affect app function
-        console.log('Analytics error:', e);
-    });
-    */
-}
-
-// Check for app updates (for PWA)
-function checkForUpdates() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(registration => {
-            registration.update();
+        
+        // Register service worker for PWA
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/service-worker.js')
+                        .then(registration => {
+                            console.log('ServiceWorker registered with scope:', registration.scope);
+                        })
+                        .catch(error => {
+                            console.log('ServiceWorker registration failed:', error);
+                        });
+                });
+            }
+        }
+        
+        // Check for app updates
+        function checkForUpdates() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.update();
+                });
+                
+                // Listen for controlling service worker changing
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    
+                    // Show update notification
+                    showNotification('App updated! Refreshing...', 'success');
+                    
+                    // Reload the page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                });
+            }
+        }
+        
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            registerServiceWorker();
         });
         
-        // Listen for controlling service worker changing
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return;
-            refreshing = true;
-            
-            // Show update notification
-            showNotification('App updated! Refreshing...', 'success');
-            
-            // Reload the page
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        });
-    }
-}
-
-// Check for updates periodically
-setInterval(checkForUpdates, 60 * 60 * 1000); // Check every hour
+        // Check for updates periodically
+        setInterval(checkForUpdates, 60 * 60 * 1000); // Check every hour
