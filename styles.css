@@ -1,0 +1,503 @@
+:root {
+    --primary-color: #007AFF;
+    --secondary-color: #FF2D55;
+    --background-color: #000;
+    --ui-light: rgba(255, 255, 255, 0.8);
+    --ui-dark: rgba(0, 0, 0, 0.6);
+    --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+    background-color: var(--background-color);
+    color: white;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    width: 100%;
+    height: 100%;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    background-color: var(--background-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 15px 0;
+    height: 44px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    position: relative;
+    z-index: 10;
+}
+
+.status-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 0;
+}
+
+.notch {
+    width: 150px;
+    height: 28px;
+    background-color: black;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+}
+
+.app-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    flex-direction: column;
+}
+
+.screen.active {
+    display: flex;
+}
+
+/* Camera Screen */
+.viewfinder-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: black;
+}
+
+#viewfinder, #photo-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hidden {
+    display: none;
+}
+
+.camera-controls {
+    height: 200px;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+}
+
+.top-controls {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 15px;
+}
+
+.mode-selector {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.mode-option {
+    padding: 5px 15px;
+    margin: 0 5px;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.3s;
+    border-radius: 16px;
+}
+
+.mode-option.active {
+    color: white;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bottom-controls {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.control-button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    font-size: 16px;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 8px var(--shadow-color);
+    transition: all 0.2s;
+}
+
+.control-button:active {
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.round-button {
+    border: none;
+    font-size: 24px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    width: 70px;
+    height: 70px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    transition: all 0.2s;
+}
+
+.round-button.small {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+}
+
+.round-button:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+#shutter-button {
+    background-color: white;
+    color: black;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+.focus-indicator {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.3s;
+    transform: translate(-50%, -50%);
+}
+
+.exposure-slider {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.exposure-slider.active {
+    opacity: 1;
+}
+
+.exposure-icon {
+    margin-bottom: 8px;
+    font-size: 24px;
+}
+
+#exposure-control {
+    -webkit-appearance: none;
+    width: 150px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 2px;
+    transform: rotate(-90deg);
+    transform-origin: center;
+    margin: 60px 0;
+}
+
+#exposure-control::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.filter-effects {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    padding: 0 10px;
+}
+
+.filter-effect-preview {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    box-shadow: 0 4px 8px var(--shadow-color);
+    transition: all 0.2s;
+}
+
+.filter-effect-preview:active {
+    transform: scale(0.95);
+}
+
+/* Gallery Screen */
+.gallery-screen {
+    background-color: #f5f5f7;
+    color: black;
+}
+
+.gallery-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: rgba(245, 245, 247, 0.8);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.gallery-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.nav-button {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 2px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.photo-item {
+    aspect-ratio: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.photo-item:active img {
+    transform: scale(0.97);
+}
+
+/* Edit Screen */
+.edit-screen {
+    background-color: black;
+}
+
+.edit-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-preview {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#edit-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.edit-tools {
+    height: 80px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+}
+
+.tool {
+    padding: 10px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+    transition: all 0.2s;
+}
+
+.tool:active {
+    transform: scale(0.95);
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.tool[data-tool="pawify"] {
+    background-color: var(--secondary-color);
+}
+
+/* Paw Mode Styles */
+.paw-mode .camera-controls {
+    background-color: rgba(255, 182, 193, 0.7);
+}
+
+.paw-mode .round-button {
+    background-color: rgba(255, 105, 180, 0.6);
+    box-shadow: 0 4px 12px rgba(255, 20, 147, 0.3);
+}
+
+.paw-mode #shutter-button {
+    background-color: rgb(255, 145, 164);
+    border: 4px solid rgba(255, 182, 193, 0.5);
+}
+
+.paw-mode .focus-indicator {
+    border: 2px solid var(--secondary-color);
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M30,20 C35,15 40,15 45,20 C50,25 55,25 60,20 C65,15 70,15 75,20" stroke="rgba(255,105,180,0.6)" fill="none" stroke-width="4" /></svg>');
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.paw-mode .control-button {
+    background: rgba(255, 105, 180, 0.4);
+}
+
+.paw-print {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="30" cy="20" r="15" fill="rgba(255,105,180,0.5)"/><circle cx="70" cy="20" r="15" fill="rgba(255,105,180,0.5)"/><circle cx="20" cy="60" r="15" fill="rgba(255,105,180,0.5)"/><circle cx="50" cy="75" r="20" fill="rgba(255,105,180,0.5)"/><circle cx="80" cy="60" r="15" fill="rgba(255,105,180,0.5)"/></svg>');
+    background-size: contain;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Animation for paw mode */
+@keyframes paw-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.paw-mode #toggle-paw-mode {
+    animation: paw-bounce 1s infinite;
+    background-color: var(--secondary-color);
+}
+
+/* HDR and Stacking mode indicator */
+.hdr-active, .stack-active {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 5;
+}
+
+.hdr-active {
+    background-color: rgba(255, 204, 0, 0.7);
+    color: black;
+}
+
+.stack-active {
+    background-color: rgba(88, 86, 214, 0.7);
+    color: white;
+}
+
+/* Image stacking progress */
+.stack-progress {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 120px;
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.stack-progress.active {
+    opacity: 1;
+}
+
+.stack-indicator {
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    border: 3px solid white;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.stack-status {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 500;
+}
